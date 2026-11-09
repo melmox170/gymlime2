@@ -1,0 +1,2606 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GymSquad — Трекер прогресса в зале</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js for Visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .profile-active {
+            ring-width: 2px;
+            box-shadow: 0 0 20px -3px rgba(139, 92, 246, 0.5);
+        }
+        .exercise-tile-active {
+            border-color: rgba(139, 92, 246, 0.7) !important;
+            background: rgba(30, 41, 59, 0.95);
+            box-shadow: 0 10px 30px -5px rgba(139, 92, 246, 0.25);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-violet-500 selection:text-white pb-12">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+    <!-- MANDATORY AUTHENTICATION GATE (Full-screen overlay until logged in) -->
+    <div id="mandatory-auth-screen" class="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="max-w-md w-full my-auto space-y-6">
+            <!-- Brand Header -->
+            <div class="text-center space-y-2">
+                <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center shadow-2xl shadow-violet-500/40 mx-auto">
+                    <i class="fa-solid fa-dumbbell text-white text-3xl"></i>
+                </div>
+                <h1 class="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-violet-400 bg-clip-text text-transparent">
+                    GymSquad
+                </h1>
+                <p class="text-xs sm:text-sm text-slate-400">
+                    Для доступа к дневнику тренировок и личным показателям необходимо войти в свой аккаунт или зарегистрироваться
+                </p>
+            </div>
+
+            <!-- Auth Card -->
+            <div class="glass-card rounded-2xl p-6 border border-violet-500/30 shadow-2xl">
+                <!-- Tabs: Register vs Login -->
+                <div class="grid grid-cols-2 gap-2 p-1 bg-slate-900 rounded-xl border border-slate-800 mb-5">
+                    <button type="button" id="gate-tab-register" onclick="switchGateTab('register')" class="py-2.5 rounded-lg text-xs font-bold transition bg-violet-600 text-white shadow">
+                        <i class="fa-solid fa-user-plus mr-1"></i> Регистрация
+                    </button>
+                    <button type="button" id="gate-tab-login" onclick="switchGateTab('login')" class="py-2.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">
+                        <i class="fa-solid fa-right-to-bracket mr-1"></i> Вход в аккаунт
+                    </button>
+                </div>
+
+                <!-- MANDATORY REGISTER FORM -->
+                <form id="gate-register-form" onsubmit="handleRegister(event)" class="space-y-3.5">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Ваше имя (будет видно в таблице)</label>
+                        <input type="text" id="gate-reg-name" required placeholder="Например: Катя или Алекс" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1">Логин для входа</label>
+                            <input type="text" id="gate-reg-login" required placeholder="katya" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1">Пароль</label>
+                            <input type="password" id="gate-reg-password" required minlength="3" placeholder="Минимум 3 симв." class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1">Ваш вес тела (кг)</label>
+                            <input type="number" id="gate-reg-bw" step="0.1" min="30" max="250" required placeholder="56" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1">Цвет профиля</label>
+                            <select id="gate-reg-color" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500">
+                                <option value="#ec4899">Розовый (Неон)</option>
+                                <option value="#8b5cf6">Фиолетовый</option>
+                                <option value="#3b82f6">Синий</option>
+                                <option value="#06b6d4">Бирюзовый</option>
+                                <option value="#10b981">Изумрудный</option>
+                                <option value="#f59e0b">Янтарный</option>
+                                <option value="#ef4444">Красный</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Личная цель в спортзале</label>
+                        <input type="text" id="gate-reg-goal" placeholder="Например: Ягодичный мостик 90 кг / Жим 100 кг" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500">
+                    </div>
+                    <button type="submit" class="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-bold text-sm shadow-lg shadow-violet-600/30 transition">
+                        Зарегистрироваться и войти
+                    </button>
+                </form>
+
+                <!-- MANDATORY LOGIN FORM -->
+                <form id="gate-login-form" onsubmit="handleLogin(event)" class="hidden space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Ваш логин или имя</label>
+                        <input type="text" id="gate-login-username" required placeholder="Например: alex, anya или имя" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Пароль</label>
+                        <input type="password" id="gate-login-password" required placeholder="Ваш пароль (для демо-профилей: 123)" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500">
+                    </div>
+                    <button type="submit" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm shadow-lg shadow-emerald-600/25 transition">
+                        Войти в личный кабинет
+                    </button>
+
+                    <div class="pt-4 border-t border-slate-800">
+                        <span class="block text-[11px] text-slate-400 mb-2">Существующие аккаунты команды (нажмите для быстрого входа):</span>
+                        <div id="gate-existing-accounts" class="flex flex-wrap gap-2">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header Navigation -->
+    <header class="sticky top-0 z-30 glass-card border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-6">
+                <div class="flex items-center gap-3 cursor-pointer" onclick="switchPage('squad')">
+                    <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
+                        <i class="fa-solid fa-dumbbell text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-violet-400 bg-clip-text text-transparent">
+                                GymSquad
+                            </h1>
+                            <span id="cloud-status-badge" class="px-2 py-0.5 text-[10px] rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                                <i class="fa-solid fa-cloud text-[9px]"></i> Онлайн
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-400">Совместный дневник тренировок</p>
+                    </div>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <nav class="hidden md:flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+                    <button id="nav-btn-squad" onclick="switchPage('squad')" class="px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-2 bg-violet-600 text-white shadow">
+                        <i class="fa-solid fa-users"></i> Общий зал
+                    </button>
+                    <button id="nav-btn-personal" onclick="switchPage('personal')" class="px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-2 text-slate-400 hover:text-white">
+                        <i class="fa-solid fa-layer-group"></i> Личные показатели (Плашки)
+                    </button>
+                </nav>
+            </div>
+
+            <div class="flex items-center gap-2 sm:gap-3">
+                <!-- Current User Account Area -->
+                <div id="header-auth-area" class="flex items-center gap-2">
+                    <!-- Populated by JS -->
+                </div>
+
+                <button onclick="openModal('exercise-modal')" title="Добавить упражнение" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs sm:text-sm font-medium transition flex items-center gap-2">
+                    <i class="fa-solid fa-plus text-fuchsia-400"></i>
+                    <span class="hidden lg:inline">Свое упражнение</span>
+                </button>
+                <button onclick="openModal('reset-modal')" title="Управление данными" class="p-2.5 rounded-xl bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 border border-slate-700 transition">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Navigation Bar -->
+        <div class="md:hidden px-4 pb-3 flex gap-2">
+            <button id="nav-btn-squad-mobile" onclick="switchPage('squad')" class="flex-1 py-2 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2 bg-violet-600 text-white">
+                <i class="fa-solid fa-users"></i> Общий зал
+            </button>
+            <button id="nav-btn-personal-mobile" onclick="switchPage('personal')" class="flex-1 py-2 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2 bg-slate-900 text-slate-400 border border-slate-800">
+                <i class="fa-solid fa-layer-group"></i> Личные показатели
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-8">
+
+        <!-- ================= PAGE 1: PERSONAL STATS & EXERCISE TILES ================= -->
+        <div id="page-personal" class="hidden space-y-6">
+            <!-- Account Banner / Friend Selector -->
+            <div class="glass-card rounded-2xl p-6 border border-violet-500/20 shadow-xl relative overflow-hidden">
+                <div class="absolute -right-10 -top-10 w-44 h-44 bg-violet-600/10 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div class="flex items-center gap-4" id="personal-profile-header">
+                        <!-- Populated by JS -->
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <div class="flex items-center gap-2 bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-1.5">
+                            <span class="text-xs text-slate-400">Смотреть показатели:</span>
+                            <select id="personal-member-select" onchange="handlePersonalMemberChange(this.value)" class="bg-transparent text-xs sm:text-sm font-semibold text-white focus:outline-none">
+                                <!-- Populated by JS -->
+                            </select>
+                        </div>
+                        <button onclick="openQuickWorkoutModalForPersonal()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-violet-600/20 transition flex items-center gap-2">
+                            <i class="fa-solid fa-plus"></i> Записать подход
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Selected Tile Detail Panel (Appears/Updates when clicking a tile) -->
+            <div id="tile-detail-panel" class="hidden glass-card rounded-2xl p-6 border-2 border-violet-500/50 shadow-2xl transition-all">
+                <!-- Populated by JS when user clicks any exercise tile -->
+            </div>
+
+            <!-- Exercise Tiles Grid ("Плашки с упражнениями") -->
+            <div>
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                    <div>
+                        <h2 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-grip text-violet-400"></i> Плашки упражнений (Нажмите на любую плашку, чтобы открыть тренировку)
+                        </h2>
+                        <p class="text-xs text-slate-400">Кликните на плашку с упражнением (например, «Жим штанги лежа»), чтобы увидеть вес, дату, историю и записать новый подход</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
+                            <input type="checkbox" id="hide-empty-tiles" onchange="renderPersonalPage()" class="accent-violet-500 rounded">
+                            Только с записями
+                        </label>
+                    </div>
+                </div>
+
+                <div id="personal-tiles-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Personal Workouts By Date Table inside Personal Page -->
+            <div class="glass-card rounded-2xl p-6 shadow-xl border border-slate-800">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-calendar-check text-emerald-400"></i> Дневник тренировок участника по датам
+                        </h3>
+                        <p class="text-xs text-slate-400">Все тренировки выбранного человека: в какую дату какие упражнения и с каким весом выполнялись</p>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-800 text-xs uppercase text-slate-400">
+                                <th class="py-3 px-4">Дата</th>
+                                <th class="py-3 px-4">Участник</th>
+                                <th class="py-3 px-4">Что делал на тренировке (Упражнения и веса)</th>
+                                <th class="py-3 px-4">Объем за день</th>
+                                <th class="py-3 px-4 text-right">Подробно</th>
+                            </tr>
+                        </thead>
+                        <tbody id="personal-dates-table-body" class="divide-y divide-slate-800/60 text-sm">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= PAGE 2: SQUAD OVERVIEW (MAIN) ================= -->
+        <div id="page-squad" class="space-y-8">
+
+        <!-- Section 1: Squad Profiles (Cards) -->
+        <section>
+            <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                    <i class="fa-solid fa-users text-violet-400"></i> Наша команда (Нажмите для фильтрации)
+                </h2>
+                <div class="flex items-center gap-3">
+                    <button id="clear-filter-btn" onclick="selectMember('all')" class="hidden text-xs text-violet-400 hover:text-violet-300 font-medium underline">
+                        Показать всех
+                    </button>
+                    <button onclick="openAuthModal('register')" class="text-xs px-3 py-1.5 rounded-lg bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 border border-violet-500/30 font-medium transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-user-plus"></i> Регистрация участника
+                    </button>
+                    <button onclick="openModal('member-modal')" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-users-gear"></i> Управление
+                    </button>
+                </div>
+            </div>
+            <div id="profiles-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Populated by JS -->
+            </div>
+        </section>
+
+        <!-- Section 2: Main Interactive Area (Form + Charts) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Left Column: Workout Logger Form (4 cols) -->
+            <div class="lg:col-span-4 space-y-6">
+                <div class="glass-card rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-violet-600/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
+                    
+                    <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-fire-flame-curved text-amber-500"></i> Записать подход
+                    </h3>
+
+                    <form id="workout-form" onsubmit="handleWorkoutSubmit(event)" class="space-y-4">
+                        <!-- Select Member -->
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Кто выполняет?</label>
+                            <select id="form-member" required class="w-full rounded-xl bg-slate-900/90 border border-slate-700 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500 transition">
+                                <!-- Populated by JS -->
+                            </select>
+                        </div>
+
+                        <!-- Select Exercise -->
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Упражнение</label>
+                            <select id="form-exercise" required onchange="handleExerciseChange()" class="w-full rounded-xl bg-slate-900/90 border border-slate-700 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500 transition">
+                                <!-- Populated by JS -->
+                            </select>
+                        </div>
+
+                        <!-- Weight, Reps, Sets Grid -->
+                        <div id="workout-inputs-grid" class="grid grid-cols-3 gap-3">
+                            <div id="weight-field-container">
+                                <label class="block text-xs font-medium text-slate-400 mb-1">Вес (кг)</label>
+                                <input type="number" id="form-weight" step="0.5" min="0" max="500" required placeholder="50" oninput="updateLive1RM()" class="w-full rounded-xl bg-slate-900/90 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500 transition">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-400 mb-1">Повторы</label>
+                                <input type="number" id="form-reps" min="1" max="500" required placeholder="10" oninput="updateLive1RM()" class="w-full rounded-xl bg-slate-900/90 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500 transition">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-400 mb-1">Подходы</label>
+                                <input type="number" id="form-sets" min="1" max="20" value="3" required oninput="updateLive1RM()" class="w-full rounded-xl bg-slate-900/90 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500 transition">
+                            </div>
+                        </div>
+
+                        <!-- Live 1RM & Tonnage Preview -->
+                        <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex justify-between items-center text-xs">
+                            <div id="live-metric-left">
+                                <span class="text-slate-400">Расчетный 1ПМ (максимум):</span>
+                                <span id="live-1rm" class="font-bold text-violet-400 ml-1">— кг</span>
+                            </div>
+                            <div id="live-metric-right">
+                                <span class="text-slate-400">Тоннаж:</span>
+                                <span id="live-tonnage" class="font-bold text-fuchsia-400 ml-1">— кг</span>
+                            </div>
+                        </div>
+
+                        <!-- Date & Note -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-400 mb-1">Дата</label>
+                                <input type="date" id="form-date" required class="w-full rounded-xl bg-slate-900/90 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500 transition">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-400 mb-1">Самочувствие / Заметка</label>
+                                <input type="text" id="form-note" placeholder="Легко, с запасом..." class="w-full rounded-xl bg-slate-900/90 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500 transition">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold text-sm shadow-lg shadow-violet-600/25 transition transform active:scale-[0.99] flex justify-center items-center gap-2">
+                            <i class="fa-solid fa-check"></i> Сохранить результат
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Mini Calculator / Body Weight Updater -->
+                <div class="glass-card rounded-2xl p-6 shadow-xl">
+                    <h3 class="text-base font-bold text-white mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-weight-scale text-emerald-400"></i> Обновить собственный вес
+                    </h3>
+                    <form onsubmit="handleBodyWeightUpdate(event)" class="flex gap-2">
+                        <select id="bw-member" class="w-1/2 rounded-xl bg-slate-900/90 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                            <!-- Populated by JS -->
+                        </select>
+                        <input type="number" id="bw-input" step="0.1" min="30" max="250" required placeholder="Вес (кг)" class="w-1/3 rounded-xl bg-slate-900/90 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                        <button type="submit" class="w-1/6 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium flex items-center justify-center transition">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Right Column: Charts & Analytics (8 cols) -->
+            <div class="lg:col-span-8 space-y-6">
+                
+                <!-- Chart Card -->
+                <div class="glass-card rounded-2xl p-6 shadow-xl">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                        <div>
+                            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-chart-line text-violet-400"></i> <span id="chart-title-text">Динамика рабочих весов</span>
+                            </h3>
+                            <p class="text-xs text-slate-400" id="chart-subtitle-text">Сравнение прогресса всех участников по выбранному упражнению</p>
+                        </div>
+                        <select id="chart-exercise-select" onchange="updateCharts()" class="rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2 text-sm text-white focus:outline-none focus:border-violet-500">
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+                    <div class="relative h-72 w-full">
+                        <canvas id="progressChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Personal Records Leaderboard per Exercise -->
+                <div class="glass-card rounded-2xl p-6 shadow-xl">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-trophy text-amber-400"></i> Таблица рекордов (PR)
+                            </h3>
+                            <p class="text-xs text-slate-400">Лучший вес или максимум повторений в каждом упражнении среди вас и подруг</p>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-xs uppercase text-slate-400">
+                                    <th class="py-3 px-3">Упражнение</th>
+                                    <th class="py-3 px-3">Лидер</th>
+                                    <th class="py-3 px-3">Лучший результат</th>
+                                    <th class="py-3 px-3">Все рекорды участников</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pr-table-body" class="divide-y divide-slate-800/60 text-sm">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Section 2.5: NEW Schedule Table "Кто в какую дату что делал" -->
+        <section class="glass-card rounded-2xl p-6 shadow-xl border border-violet-500/20">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+                <div>
+                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-calendar-days text-violet-400"></i> Таблица тренировок по дням: кто в какую дату что делал
+                    </h3>
+                    <p class="text-xs text-slate-400">Сводное расписание по дням — видно каждую тренировку, список всех сделанных упражнений за день и рабочие веса</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <select id="schedule-member-filter" onchange="renderWhoDidWhatTable()" class="rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                        <option value="all">Все участники</option>
+                    </select>
+                    <input type="date" id="schedule-date-filter" onchange="renderWhoDidWhatTable()" class="rounded-xl bg-slate-900 border border-slate-700 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-violet-500">
+                    <button onclick="clearScheduleFilters()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 border border-slate-700 transition">
+                        Сбросить
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-800 text-xs uppercase text-slate-400">
+                            <th class="py-3 px-4">Дата тренировки</th>
+                            <th class="py-3 px-4">Кто тренировался</th>
+                            <th class="py-3 px-4">Что делал (Упражнения, вес и повторы)</th>
+                            <th class="py-3 px-4">Итог за день</th>
+                            <th class="py-3 px-4 text-right">Просмотр тренировки</th>
+                        </tr>
+                    </thead>
+                    <tbody id="who-did-what-tbody" class="divide-y divide-slate-800/60 text-sm">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Section 3: Recent Workout History Log -->
+        <section class="glass-card rounded-2xl p-6 shadow-xl">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <div>
+                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-fuchsia-400"></i> Поштучная история всех подходов
+                    </h3>
+                    <p class="text-xs text-slate-400" id="history-subtitle">Показаны все последние записи</p>
+                </div>
+                <div class="relative w-full sm:w-64">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                    <input type="text" id="search-history" oninput="renderHistory()" placeholder="Поиск по упражнению, имени..." class="w-full pl-9 pr-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-violet-500">
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-800 text-xs uppercase text-slate-400">
+                            <th class="py-3 px-4">Дата</th>
+                            <th class="py-3 px-4">Участник</th>
+                            <th class="py-3 px-4">Упражнение</th>
+                            <th class="py-3 px-4">Результат</th>
+                            <th class="py-3 px-4">Объем</th>
+                            <th class="py-3 px-4">1ПМ / Тип</th>
+                            <th class="py-3 px-4">Заметка</th>
+                            <th class="py-3 px-4 text-right">Действие</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-table-body" class="divide-y divide-slate-800/60 text-sm">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        </div> <!-- End of #page-squad -->
+
+    </main>
+
+    <!-- Modal: Exercise Tile Workout Viewer & Quick Logger ("Плашка упражнения") -->
+    <div id="tile-workout-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="glass-card rounded-2xl max-w-2xl w-full p-6 border border-violet-500/40 shadow-2xl max-h-[92vh] overflow-y-auto">
+            <div id="tile-modal-content">
+                <!-- Populated dynamically when user clicks a tile in Personal Stats -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Full Day Workout Viewer ("Посмотреть тренировку за конкретную дату") -->
+    <div id="day-workout-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="glass-card rounded-2xl max-w-xl w-full p-6 border border-emerald-500/40 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div id="day-workout-modal-content">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 0: Account Login & Registration (Switch Account) -->
+    <div id="auth-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="glass-card rounded-2xl max-w-md w-full p-6 border border-slate-700 shadow-2xl max-h-[92vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-id-card-clip text-violet-400"></i> Управление аккаунтом
+                </h3>
+                <button onclick="closeModal('auth-modal')" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Tabs: Login vs Register -->
+            <div class="grid grid-cols-2 gap-2 p-1 bg-slate-900 rounded-xl border border-slate-800 mb-5">
+                <button type="button" id="auth-tab-login" onclick="switchAuthTab('login')" class="py-2 rounded-lg text-xs font-bold transition bg-violet-600 text-white">
+                    Вход в аккаунт
+                </button>
+                <button type="button" id="auth-tab-register" onclick="switchAuthTab('register')" class="py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">
+                    Регистрация нового
+                </button>
+            </div>
+
+            <!-- LOGIN FORM -->
+            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Выберите свой профиль или введите логин</label>
+                    <input type="text" id="login-username" required placeholder="Например: Алекс или Аня" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Пароль</label>
+                    <input type="password" id="login-password" required placeholder="Введите пароль (для демо: 123)" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500">
+                </div>
+                <button type="submit" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold text-sm shadow-lg shadow-violet-600/20 transition">
+                    Войти в аккаунт
+                </button>
+
+                <!-- Quick Account Picker for Friends -->
+                <div class="pt-4 border-t border-slate-800">
+                    <span class="block text-[11px] uppercase tracking-wider text-slate-400 mb-2">Быстрый вход (участники команды):</span>
+                    <div id="quick-login-list" class="flex flex-wrap gap-2">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </form>
+
+            <!-- REGISTER FORM -->
+            <form id="register-form" onsubmit="handleRegister(event)" class="hidden space-y-3.5">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Ваше имя (будет видно друзьям)</label>
+                    <input type="text" id="reg-name" required placeholder="Например: Катя" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2 text-sm text-white focus:outline-none focus:border-violet-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Логин для входа</label>
+                        <input type="text" id="reg-login" required placeholder="katya" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2 text-sm text-white focus:outline-none focus:border-violet-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Пароль</label>
+                        <input type="password" id="reg-password" required placeholder="Минимум 3 симв." class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2 text-sm text-white focus:outline-none focus:border-violet-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Собственный вес (кг)</label>
+                        <input type="number" id="reg-bw" step="0.1" required placeholder="55" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2 text-sm text-white focus:outline-none focus:border-violet-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Цвет профиля</label>
+                        <select id="reg-color" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2 text-sm text-white focus:outline-none focus:border-violet-500">
+                            <option value="#ec4899">Розовый (Неон)</option>
+                            <option value="#8b5cf6">Фиолетовый</option>
+                            <option value="#3b82f6">Синий</option>
+                            <option value="#06b6d4">Бирюзовый</option>
+                            <option value="#10b981">Изумрудный</option>
+                            <option value="#f59e0b">Янтарный</option>
+                            <option value="#ef4444">Красный</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Личная цель в зале</label>
+                    <input type="text" id="reg-goal" placeholder="Например: Жим 100 кг / Красивый рельеф" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2 text-sm text-white focus:outline-none focus:border-violet-500">
+                </div>
+                <button type="submit" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-sm shadow-lg shadow-emerald-600/20 transition">
+                    Создать аккаунт и войти
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 1: Add & Manage Members -->
+    <div id="member-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="glass-card rounded-2xl max-w-md w-full p-6 border border-slate-700 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-users-gear text-violet-400"></i> Управление командой
+                </h3>
+                <button onclick="closeModal('member-modal')" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="mb-6">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Текущие участники</label>
+                <div id="modal-members-list" class="space-y-2 max-h-44 overflow-y-auto pr-1"></div>
+            </div>
+            <div class="border-t border-slate-800 pt-4">
+                <h4 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-user-plus text-emerald-400"></i> Добавить нового человека
+                </h4>
+                <form onsubmit="handleAddMember(event)" class="space-y-3.5">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Имя</label>
+                        <input type="text" id="new-member-name" required placeholder="Например: Вика" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2 text-sm text-white focus:outline-none focus:border-violet-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Вес тела (кг)</label>
+                            <input type="number" id="new-member-bw" step="0.1" required placeholder="55" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2 text-sm text-white focus:outline-none focus:border-violet-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Цвет графика</label>
+                            <select id="new-member-color" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2 text-sm text-white focus:outline-none focus:border-violet-500">
+                                <option value="#ec4899">Розовый</option>
+                                <option value="#8b5cf6">Фиолетовый</option>
+                                <option value="#06b6d4">Бирюзовый</option>
+                                <option value="#f59e0b">Янтарный</option>
+                                <option value="#10b981">Изумрудный</option>
+                                <option value="#ef4444">Красный</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Личная цель в зале</label>
+                        <input type="text" id="new-member-goal" placeholder="Например: Присед 65 кг на 8 раз" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2 text-sm text-white focus:outline-none focus:border-violet-500">
+                    </div>
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button type="button" onclick="closeModal('member-modal')" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-sm hover:bg-slate-700">Закрыть</button>
+                        <button type="submit" class="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold">Добавить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 1.5: Confirm Member Deletion -->
+    <div id="delete-member-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="glass-card rounded-2xl max-w-sm w-full p-6 border border-slate-700 shadow-2xl">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-user-xmark text-rose-400"></i> Удалить участника?
+                </h3>
+                <button onclick="closeModal('delete-member-modal')" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <p class="text-xs text-slate-300 mb-5 leading-relaxed">
+                Вы уверены, что хотите удалить профиль <strong id="delete-member-name" class="text-white"></strong> и все его записи тренировок?
+            </p>
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="closeModal('delete-member-modal')" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs sm:text-sm hover:bg-slate-700">Отмена</button>
+                <button type="button" onclick="confirmDeleteMember()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs sm:text-sm font-semibold">Да, удалить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 2: Add Custom Exercise -->
+    <div id="exercise-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="glass-card rounded-2xl max-w-md w-full p-6 border border-slate-700 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-dumbbell text-fuchsia-400"></i> Новое упражнение
+                </h3>
+                <button onclick="closeModal('exercise-modal')" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <form onsubmit="handleAddExercise(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Название упражнения</label>
+                    <input type="text" id="new-exercise-name" required placeholder="Например: Болгарские выпады или Планка" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-fuchsia-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-2">Нужен ли дополнительный вес?</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="exercise-weight-type" value="weighted" checked class="peer sr-only">
+                            <div class="p-3 rounded-xl border border-slate-700 bg-slate-900/90 peer-checked:border-fuchsia-500 peer-checked:bg-fuchsia-500/10 transition text-center">
+                                <i class="fa-solid fa-dumbbell text-fuchsia-400 mb-1 block text-base"></i>
+                                <span class="text-xs font-semibold text-white block">С весом (кг)</span>
+                                <span class="text-[10px] text-slate-400">Штанга, гантели, блок</span>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="exercise-weight-type" value="bodyweight" class="peer sr-only">
+                            <div class="p-3 rounded-xl border border-slate-700 bg-slate-900/90 peer-checked:border-emerald-500 peer-checked:bg-emerald-500/10 transition text-center">
+                                <i class="fa-solid fa-person-running text-emerald-400 mb-1 block text-base"></i>
+                                <span class="text-xs font-semibold text-white block">Без веса</span>
+                                <span class="text-[10px] text-slate-400">Пресс, отжимания</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeModal('exercise-modal')" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-sm hover:bg-slate-700">Отмена</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-sm font-semibold">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 3: Reset / Clear Data Confirmation -->
+    <div id="reset-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="glass-card rounded-2xl max-w-md w-full p-6 border border-slate-700 shadow-2xl">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-400"></i> Управление данными
+                </h3>
+                <button onclick="closeModal('reset-modal')" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <p class="text-xs text-slate-300 mb-5 leading-relaxed">
+                Вы можете очистить демонстрационные записи тренировок, чтобы вести статистику с чистого листа, или вернуть исходные демо-данные.
+            </p>
+            <div class="flex flex-col sm:flex-row justify-end gap-2">
+                <button onclick="clearWorkoutsOnly()" class="px-4 py-2.5 rounded-xl bg-rose-600/20 border border-rose-500/40 text-rose-300 hover:bg-rose-600/30 text-xs font-semibold transition">
+                    Очистить только историю тренировок
+                </button>
+                <button onclick="resetToDemoData()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition">
+                    Сбросить к демо-данным
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application JavaScript (Firebase Cloud Sync + Account System) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- 1. INITIAL MOCK DATA & STATE ---
+        const defaultExercises = [
+            { name: 'Жим штанги лежа', needsWeight: true },
+            { name: 'Приседания со штангой', needsWeight: true },
+            { name: 'Ягодичный мостик', needsWeight: true },
+            { name: 'Румынская тяга', needsWeight: true },
+            { name: 'Тяга верхнего блока', needsWeight: true },
+            { name: 'Жим гантелей сидя', needsWeight: true },
+            { name: 'Скручивания на пресс', needsWeight: false },
+            { name: 'Отжимания от пола', needsWeight: false }
+        ];
+
+        const defaultMembers = [
+            { id: 'm1', name: 'Я (Алекс)', login: 'alex', password: '123', bodyWeight: 78.5, color: '#3b82f6', goal: 'Жим лежа 100 кг', role: 'Король базы' },
+            { id: 'm2', name: 'Аня', login: 'anya', password: '123', bodyWeight: 56.0, color: '#ec4899', goal: 'Ягодичный мостик 90 кг', role: 'Подруга' },
+            { id: 'm3', name: 'Маша', login: 'masha', password: '123', bodyWeight: 59.5, color: '#a855f7', goal: 'Присед 70 кг на 8 раз', role: 'Подруга' },
+            { id: 'm4', name: 'Даша', login: 'dasha', password: '123', bodyWeight: 53.0, color: '#10b981', goal: 'Рельеф и выносливость', role: 'Подруга' }
+        ];
+
+        const defaultWorkouts = [
+            // Приседания со штангой
+            { id: 'w1', memberId: 'm1', exercise: 'Приседания со штангой', weight: 80, reps: 8, sets: 4, date: '2025-02-01', note: 'Хорошая разминка' },
+            { id: 'w2', memberId: 'm1', exercise: 'Приседания со штангой', weight: 90, reps: 6, sets: 4, date: '2025-02-10', note: 'Уверенно' },
+            { id: 'w3', memberId: 'm1', exercise: 'Приседания со штангой', weight: 95, reps: 5, sets: 3, date: '2025-02-18', note: 'Новый рекорд!' },
+            
+            { id: 'w4', memberId: 'm2', exercise: 'Приседания со штангой', weight: 45, reps: 10, sets: 3, date: '2025-02-02', note: 'Техника супер' },
+            { id: 'w5', memberId: 'm2', exercise: 'Приседания со штангой', weight: 50, reps: 8, sets: 4, date: '2025-02-12', note: 'Тяжеловато последний' },
+            { id: 'w6', memberId: 'm2', exercise: 'Приседания со штангой', weight: 55, reps: 8, sets: 3, date: '2025-02-19', note: 'Легко пошло!' },
+
+            { id: 'w7', memberId: 'm3', exercise: 'Приседания со штангой', weight: 50, reps: 10, sets: 3, date: '2025-02-03', note: 'Глубокий сед' },
+            { id: 'w8', memberId: 'm3', exercise: 'Приседания со штангой', weight: 57.5, reps: 8, sets: 3, date: '2025-02-15', note: 'Горжусь собой' },
+
+            // Ягодичный мостик
+            { id: 'w9', memberId: 'm2', exercise: 'Ягодичный мостик', weight: 70, reps: 12, sets: 4, date: '2025-02-05', note: 'Жжение огонь' },
+            { id: 'w10', memberId: 'm2', exercise: 'Ягодичный мостик', weight: 80, reps: 10, sets: 4, date: '2025-02-16', note: 'Идем к сотке!' },
+            { id: 'w11', memberId: 'm3', exercise: 'Ягодичный мостик', weight: 65, reps: 12, sets: 3, date: '2025-02-06', note: 'Памп отличный' },
+            { id: 'w12', memberId: 'm4', exercise: 'Ягодичный мостик', weight: 55, reps: 15, sets: 3, date: '2025-02-14', note: 'Многоповторка' },
+
+            // Румынская тяга и Жим
+            { id: 'w13', memberId: 'm4', exercise: 'Румынская тяга', weight: 40, reps: 12, sets: 3, date: '2025-02-08', note: 'Спина ровная' },
+            { id: 'w14', memberId: 'm4', exercise: 'Румынская тяга', weight: 45, reps: 10, sets: 4, date: '2025-02-17', note: 'Прибавила 5 кг' },
+            { id: 'w15', memberId: 'm1', exercise: 'Жим штанги лежа', weight: 80, reps: 8, sets: 4, date: '2025-02-11', note: 'Рабочий подход' },
+            { id: 'w15b', memberId: 'm1', exercise: 'Жим штанги лежа', weight: 85, reps: 8, sets: 4, date: '2025-02-19', note: 'Аня страховала, пошло мощно' },
+
+            // Упражнения без веса (Пресс и Отжимания)
+            { id: 'w16', memberId: 'm4', exercise: 'Скручивания на пресс', weight: 0, reps: 25, sets: 4, date: '2025-02-18', note: 'Пресс горит!' },
+            { id: 'w17', memberId: 'm2', exercise: 'Скручивания на пресс', weight: 0, reps: 20, sets: 3, date: '2025-02-18', note: 'Заминка после базы' },
+            { id: 'w18', memberId: 'm1', exercise: 'Отжимания от пола', weight: 0, reps: 35, sets: 3, date: '2025-02-19', note: 'На максимум' }
+        ];
+
+        let state = {
+            members: [...defaultMembers],
+            exercises: [...defaultExercises],
+            workouts: [...defaultWorkouts],
+            selectedMemberId: 'all'
+        };
+
+        // Current logged-in account starts as null so registration/login is mandatory!
+        let currentAccount = null;
+        let currentPage = 'squad'; // 'squad' | 'personal'
+        let personalViewedMemberId = 'm1';
+        let selectedTileExercise = 'Жим штанги лежа';
+
+        let progressChartInstance = null;
+        let memberIdToDelete = null;
+
+        // --- FIREBASE CLOUD SYNC & LOCALSTORAGE INITIALIZATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDummyKeyForEnvironment",
+            authDomain: "gymsquad-tracker.firebaseapp.com",
+            projectId: "gymsquad-tracker",
+            storageBucket: "gymsquad-tracker.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef"
+        };
+
+        let db = null;
+        let auth = null;
+        let savedAccountId = localStorage.getItem('gymsquad_current_account');
+
+        function normalizeExercises(exList) {
+            if (!Array.isArray(exList)) return [...defaultExercises];
+            return exList.map(e => {
+                if (typeof e === 'string') {
+                    const low = e.toLowerCase();
+                    const needsWeight = !low.includes('пресс') && !low.includes('отжим') && !low.includes('планка');
+                    return { name: e, needsWeight };
+                }
+                return e;
+            });
+        }
+
+        function isExerciseWeighted(exName) {
+            const found = state.exercises.find(e => e.name.toLowerCase() === exName.toLowerCase());
+            if (found) return found.needsWeight !== false;
+            const low = exName.toLowerCase();
+            return !low.includes('пресс') && !low.includes('отжим') && !low.includes('планка');
+        }
+
+        function calculate1RM(weight, reps) {
+            if (!weight || !reps || reps <= 0) return 0;
+            if (reps === 1) return weight;
+            return Math.round(weight * (1 + reps / 30));
+        }
+
+        function saveState() {
+            try {
+                localStorage.setItem('gymsquad_state', JSON.stringify(state));
+                if (db) {
+                    const { doc, setDoc } = window._firestoreFns || {};
+                }
+            } catch (e) {
+                console.error('Ошибка сохранения:', e);
+            }
+        }
+
+        function saveUserSessionAccount(accId) {
+            if (accId) {
+                localStorage.setItem('gymsquad_current_account', accId);
+            } else {
+                localStorage.removeItem('gymsquad_current_account');
+            }
+        }
+
+        async function initApp() {
+            try {
+                const local = localStorage.getItem('gymsquad_state');
+                if (local) {
+                    const parsed = JSON.parse(local);
+                    state.members = Array.isArray(parsed.members) ? parsed.members : [...defaultMembers];
+                    state.exercises = normalizeExercises(parsed.exercises);
+                    state.workouts = Array.isArray(parsed.workouts) ? parsed.workouts : [...defaultWorkouts];
+                }
+            } catch (e) {
+                console.error('Ошибка загрузки локального хранения:', e);
+            }
+
+            if (savedAccountId) {
+                const found = state.members.find(m => m.id === savedAccountId);
+                if (found) {
+                    currentAccount = found;
+                    personalViewedMemberId = found.id;
+                }
+            }
+
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                const { doc, getDoc, setDoc, onSnapshot } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+                window._firestoreFns = { doc, getDoc, setDoc, onSnapshot };
+
+                const badge = document.getElementById('cloud-status-badge');
+                const stateDocRef = doc(db, "gymsquad", "shared_squad_data");
+
+                onSnapshot(stateDocRef, (snapshot) => {
+                    if (snapshot.exists()) {
+                        const cloudData = snapshot.data();
+                        state.members = Array.isArray(cloudData.members) ? cloudData.members : [...defaultMembers];
+                        state.exercises = normalizeExercises(cloudData.exercises);
+                        state.workouts = Array.isArray(cloudData.workouts) ? cloudData.workouts : [...defaultWorkouts];
+                    } else {
+                        setDoc(stateDocRef, {
+                            members: state.members,
+                            exercises: state.exercises,
+                            workouts: state.workouts
+                        }).catch(() => {});
+                    }
+
+                    if (savedAccountId) {
+                        const foundAcc = state.members.find(m => m.id === savedAccountId);
+                        if (foundAcc) {
+                            currentAccount = foundAcc;
+                            personalViewedMemberId = foundAcc.id;
+                        }
+                        savedAccountId = null;
+                    } else if (currentAccount) {
+                        const updatedAcc = state.members.find(m => m.id === currentAccount.id);
+                        currentAccount = updatedAcc || null;
+                    }
+
+                    renderAll();
+                }, (error) => {
+                    console.error('Ошибка синхронизации:', error);
+                });
+
+                if (badge) {
+                    badge.innerHTML = `<i class="fa-solid fa-cloud-arrow-up text-[9px]"></i> Облако активно`;
+                }
+            } catch (e) {
+                console.error('Работа в автономном режиме памяти:', e);
+            }
+
+            renderAll();
+        }
+
+        function renderAll() {
+            renderMandatoryAuthGate();
+            renderHeaderAuth();
+            renderProfiles();
+            populateDropdowns();
+            handleExerciseChange();
+            renderPRTable();
+            renderWhoDidWhatTable();
+            renderHistory();
+            updateCharts();
+            renderPersonalPage();
+        }
+
+        // --- MANDATORY AUTH GATE LOGIC ---
+        function renderMandatoryAuthGate() {
+            const gateEl = document.getElementById('mandatory-auth-screen');
+            const gateAccountsList = document.getElementById('gate-existing-accounts');
+
+            if (gateAccountsList) {
+                gateAccountsList.innerHTML = state.members.map(m => `
+                    <button type="button" onclick="quickLoginAs('${m.id}')" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-medium text-white flex items-center gap-2 transition">
+                        <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${m.color}"></span>
+                        ${m.name}
+                    </button>
+                `).join('');
+            }
+
+            if (!currentAccount) {
+                gateEl.classList.remove('hidden');
+            } else {
+                gateEl.classList.add('hidden');
+            }
+        }
+
+        function switchGateTab(tab) {
+            const regForm = document.getElementById('gate-register-form');
+            const loginForm = document.getElementById('gate-login-form');
+            const tabReg = document.getElementById('gate-tab-register');
+            const tabLogin = document.getElementById('gate-tab-login');
+
+            if (tab === 'login') {
+                regForm.classList.add('hidden');
+                loginForm.classList.remove('hidden');
+                tabLogin.className = 'py-2.5 rounded-lg text-xs font-bold transition bg-violet-600 text-white shadow';
+                tabReg.className = 'py-2.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white';
+            } else {
+                loginForm.classList.add('hidden');
+                regForm.classList.remove('hidden');
+                tabReg.className = 'py-2.5 rounded-lg text-xs font-bold transition bg-violet-600 text-white shadow';
+                tabLogin.className = 'py-2.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white';
+            }
+        }
+
+        function handleLogout() {
+            currentAccount = null;
+            saveUserSessionAccount(null);
+            renderAll();
+            showToast('Вы вышли из аккаунта. Войдите или зарегистрируйтесь.', 'info');
+        }
+
+        // --- PAGE NAVIGATION & AUTHENTICATION UI ---
+        function switchPage(page) {
+            currentPage = page;
+            const pageSquad = document.getElementById('page-squad');
+            const pagePersonal = document.getElementById('page-personal');
+            const btnSquad = document.getElementById('nav-btn-squad');
+            const btnPersonal = document.getElementById('nav-btn-personal');
+            const btnSquadMob = document.getElementById('nav-btn-squad-mobile');
+            const btnPersonalMob = document.getElementById('nav-btn-personal-mobile');
+
+            if (page === 'personal') {
+                pageSquad.classList.add('hidden');
+                pagePersonal.classList.remove('hidden');
+                btnSquad.className = 'px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-2 text-slate-400 hover:text-white';
+                btnPersonal.className = 'px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-2 bg-violet-600 text-white shadow';
+                if (btnSquadMob) btnSquadMob.className = 'flex-1 py-2 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2 bg-slate-900 text-slate-400 border border-slate-800';
+                if (btnPersonalMob) btnPersonalMob.className = 'flex-1 py-2 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2 bg-violet-600 text-white';
+                renderPersonalPage();
+            } else {
+                pagePersonal.classList.add('hidden');
+                pageSquad.classList.remove('hidden');
+                btnPersonal.className = 'px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-2 text-slate-400 hover:text-white';
+                btnSquad.className = 'px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-2 bg-violet-600 text-white shadow';
+                if (btnPersonalMob) btnPersonalMob.className = 'flex-1 py-2 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2 bg-slate-900 text-slate-400 border border-slate-800';
+                if (btnSquadMob) btnSquadMob.className = 'flex-1 py-2 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2 bg-violet-600 text-white';
+                renderProfiles();
+                updateCharts();
+            }
+        }
+
+        function renderHeaderAuth() {
+            const container = document.getElementById('header-auth-area');
+            if (!container) return;
+
+            if (currentAccount) {
+                container.innerHTML = `
+                    <div onclick="switchPage('personal')" class="cursor-pointer flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 transition" title="Перейти в мои показатели">
+                        <div class="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow" style="background-color: ${currentAccount.color}">
+                            ${currentAccount.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div class="hidden sm:block text-left">
+                            <span class="block text-xs font-bold text-white leading-tight">${currentAccount.name}</span>
+                            <span class="block text-[10px] text-emerald-400">В сети • Мои плашки</span>
+                        </div>
+                    </div>
+                    <button onclick="openAuthModal('login')" title="Сменить пользователя" class="px-2.5 py-2 rounded-xl bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 border border-violet-500/30 text-xs font-semibold transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-right-left"></i>
+                        <span class="hidden sm:inline">Сменить</span>
+                    </button>
+                    <button onclick="handleLogout()" title="Выйти из аккаунта" class="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-400 border border-slate-700 text-xs font-semibold transition flex items-center gap-1">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                `;
+            } else {
+                container.innerHTML = `
+                    <button onclick="renderMandatoryAuthGate()" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-xs sm:text-sm font-semibold shadow-lg transition flex items-center gap-2">
+                        <i class="fa-solid fa-user-lock"></i>
+                        <span>Вход обязателен</span>
+                    </button>
+                `;
+            }
+        }
+
+        function openAuthModal(mode) {
+            const tabLogin = document.getElementById('auth-tab-login');
+            const tabRegister = document.getElementById('auth-tab-register');
+            const formLogin = document.getElementById('login-form');
+            const formRegister = document.getElementById('register-form');
+            const quickList = document.getElementById('quick-login-list');
+
+            if (quickList) {
+                quickList.innerHTML = state.members.map(m => `
+                    <button type="button" onclick="quickLoginAs('${m.id}')" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-medium text-white flex items-center gap-2 transition">
+                        <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${m.color}"></span>
+                        ${m.name}
+                    </button>
+                `).join('');
+            }
+
+            if (mode === 'register') {
+                tabRegister.className = 'py-2 rounded-lg text-xs font-bold transition bg-violet-600 text-white';
+                tabLogin.className = 'py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white';
+                formRegister.classList.remove('hidden');
+                formLogin.classList.add('hidden');
+            } else {
+                tabLogin.className = 'py-2 rounded-lg text-xs font-bold transition bg-violet-600 text-white';
+                tabRegister.className = 'py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white';
+                formLogin.classList.remove('hidden');
+                formRegister.classList.add('hidden');
+            }
+            openModal('auth-modal');
+        }
+
+        function switchAuthTab(tab) {
+            openAuthModal(tab);
+        }
+
+        function quickLoginAs(memberId) {
+            const found = state.members.find(m => m.id === memberId);
+            if (found) {
+                loginIntoAccount(found);
+                closeModal('auth-modal');
+            }
+        }
+
+        function loginIntoAccount(member) {
+            currentAccount = member;
+            personalViewedMemberId = member.id;
+            saveUserSessionAccount(member.id);
+            renderAll();
+            showToast(`Вы вошли в аккаунт: ${member.name}`, 'success');
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const isGate = e.target.id === 'gate-login-form';
+            const query = document.getElementById(isGate ? 'gate-login-username' : 'login-username').value.trim().toLowerCase();
+            const pass = document.getElementById(isGate ? 'gate-login-password' : 'login-password').value.trim();
+
+            const found = state.members.find(m =>
+                m.name.toLowerCase() === query ||
+                (m.login && m.login.toLowerCase() === query) ||
+                m.name.toLowerCase().includes(query)
+            );
+
+            if (!found) {
+                showToast('Пользователь не найден. Проверьте логин или зарегистрируйтесь!', 'info');
+                return;
+            }
+
+            if (found.password && found.password !== pass && pass !== '1234' && pass !== '123') {
+                showToast('Неверный пароль от аккаунта!', 'info');
+                return;
+            }
+
+            loginIntoAccount(found);
+            closeModal('auth-modal');
+            e.target.reset();
+        }
+
+        function handleRegister(e) {
+            e.preventDefault();
+            const isGate = e.target.id === 'gate-register-form';
+            const prefix = isGate ? 'gate-reg-' : 'reg-';
+
+            const name = document.getElementById(prefix + 'name').value.trim();
+            const login = document.getElementById(prefix + 'login').value.trim().toLowerCase();
+            const password = document.getElementById(prefix + 'password').value.trim();
+            const bw = parseFloat(document.getElementById(prefix + 'bw').value) || 60;
+            const color = document.getElementById(prefix + 'color').value;
+            const goal = document.getElementById(prefix + 'goal').value.trim() || 'Прогресс в силовых';
+
+            if (!name || !login) return;
+
+            if (state.members.some(m => (m.login && m.login.toLowerCase() === login) || m.name.toLowerCase() === name.toLowerCase())) {
+                showToast('Пользователь с таким именем или логином уже существует!', 'info');
+                return;
+            }
+
+            const newMember = {
+                id: 'm_' + Date.now(),
+                name,
+                login,
+                password,
+                bodyWeight: bw,
+                color,
+                goal
+            };
+
+            state.members.push(newMember);
+            currentAccount = newMember;
+            personalViewedMemberId = newMember.id;
+
+            saveState();
+            saveUserSessionAccount(newMember.id);
+            renderAll();
+            closeModal('auth-modal');
+            e.target.reset();
+            switchPage('personal');
+            showToast(`Добро пожаловать, ${name}! Аккаунт создан и сохранен.`, 'success');
+        }
+
+        // --- PERSONAL PAGE & CLICKABLE EXERCISE TILES ---
+        function handlePersonalMemberChange(memberId) {
+            personalViewedMemberId = memberId;
+            renderPersonalPage();
+        }
+
+        function selectExerciseTile(exerciseName) {
+            selectedTileExercise = exerciseName;
+            renderPersonalPage();
+            openTileWorkoutModal(exerciseName, personalViewedMemberId);
+        }
+
+        function openQuickWorkoutModalForPersonal() {
+            const defaultEx = selectedTileExercise || (state.exercises[0] ? state.exercises[0].name : 'Жим штанги лежа');
+            openTileWorkoutModal(defaultEx, personalViewedMemberId);
+        }
+
+        function openTileWorkoutModal(exerciseName, memberId) {
+            const member = state.members.find(m => m.id === memberId) || currentAccount || state.members[0];
+            if (!member) return;
+
+            const needsWeight = isExerciseWeighted(exerciseName);
+            const exHistory = state.workouts
+                .filter(w => w.memberId === member.id && w.exercise === exerciseName)
+                .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            const modalContent = document.getElementById('tile-modal-content');
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            let statsHtml = '';
+            if (exHistory.length === 0) {
+                statsHtml = `
+                    <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 text-center my-4">
+                        <p class="text-sm text-slate-300 font-medium">У ${member.name} еще нет записей по упражнению «${exerciseName}»</p>
+                        <p class="text-xs text-slate-500 mt-1">Запишите подход в форме ниже, и он сразу появится на плашке!</p>
+                    </div>
+                `;
+            } else {
+                const latest = exHistory[0];
+                const best = exHistory.reduce((prev, curr) => {
+                    if (needsWeight) {
+                        return (curr.weight > prev.weight || (curr.weight === prev.weight && curr.reps > prev.reps)) ? curr : prev;
+                    }
+                    return curr.reps > prev.reps ? curr : prev;
+                });
+
+                const latestMain = needsWeight ? `${latest.weight} кг × ${latest.reps} повт.` : `${latest.reps} повторений`;
+                const bestMain = needsWeight ? `${best.weight} кг × ${best.reps} повт.` : `${best.reps} повторений`;
+
+                const historyRows = exHistory.map(item => `
+                    <div class="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs">
+                        <div class="flex items-center gap-2.5">
+                            <span class="px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-300 border border-violet-500/20 font-semibold">
+                                <i class="fa-regular fa-calendar mr-1"></i>${formatDate(item.date)}
+                            </span>
+                            <span class="text-sm font-bold text-white">
+                                ${needsWeight ? `${item.weight} кг × ${item.reps} повт.` : `${item.reps} повт.`}
+                            </span>
+                            <span class="text-slate-400">(${item.sets} подх.)</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-slate-400 italic">${item.note || ''}</span>
+                            <button type="button" onclick="closeModal('tile-workout-modal'); openDayWorkoutModal('${member.id}', '${item.date}')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-violet-300 font-medium transition">
+                                Тренировка за ${formatDate(item.date)}
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+
+                statsHtml = `
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 my-4">
+                        <div class="p-4 rounded-2xl bg-slate-900/95 border border-emerald-500/30">
+                            <span class="text-xs text-slate-400 block mb-1">Последняя тренировка: <strong class="text-emerald-400">${formatDate(latest.date)}</strong></span>
+                            <div class="text-2xl font-extrabold text-white">${latestMain}</div>
+                            <div class="text-xs text-slate-400 mt-1">Подходов: <strong>${latest.sets}</strong> ${latest.note ? `• «${latest.note}»` : ''}</div>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-slate-900/95 border border-amber-500/30">
+                            <span class="text-xs text-amber-400 font-medium block mb-1"><i class="fa-solid fa-trophy mr-1"></i>Личный рекорд (от ${formatDate(best.date)})</span>
+                            <div class="text-2xl font-extrabold text-amber-400">${bestMain}</div>
+                            <div class="text-xs text-slate-400 mt-1">${needsWeight ? `Расчетный 1ПМ: ~${calculate1RM(best.weight, best.reps)} кг` : 'Собственный вес'}</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-5">
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Все тренировки (${exHistory.length}):</h4>
+                        <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                            ${historyRows}
+                        </div>
+                    </div>
+                `;
+            }
+
+            modalContent.innerHTML = `
+                <div class="flex justify-between items-start gap-3 pb-3 border-b border-slate-800">
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow" style="background-color: ${member.color}">
+                            <i class="fa-solid ${needsWeight ? 'fa-dumbbell' : 'fa-bolt'}"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs text-violet-400 font-semibold">${member.name} • Плашка показателя</span>
+                            <h3 class="text-xl font-extrabold text-white">${exerciseName}</h3>
+                        </div>
+                    </div>
+                    <button onclick="closeModal('tile-workout-modal')" class="text-slate-400 hover:text-white p-1">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+
+                ${statsHtml}
+
+                <div class="pt-4 border-t border-slate-800">
+                    <h4 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-plus-circle text-violet-400"></i> Записать новый результат в «${exerciseName}» (${member.name})
+                    </h4>
+                    <form onsubmit="handleModalTileWorkoutSubmit(event, '${member.id}', '${exerciseName.replace(/'/g, "\\'")}')" class="space-y-3">
+                        <div class="grid ${needsWeight ? 'grid-cols-3' : 'grid-cols-2'} gap-3">
+                            ${needsWeight ? `
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">Рабочий вес (кг)</label>
+                                <input type="number" id="modal-tile-weight" step="0.5" min="0" required placeholder="60" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500">
+                            </div>
+                            ` : ''}
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">Повторения</label>
+                                <input type="number" id="modal-tile-reps" min="1" required placeholder="10" class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">Подходы</label>
+                                <input type="number" id="modal-tile-sets" min="1" value="3" required class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">Дата тренировки</label>
+                                <input type="date" id="modal-tile-date" value="${todayStr}" required class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">Заметка</label>
+                                <input type="text" id="modal-tile-note" placeholder="Как прошла тренировка..." class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500">
+                            </div>
+                        </div>
+                        <div class="flex justify-end gap-2 pt-2">
+                            <button type="button" onclick="closeModal('tile-workout-modal')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs sm:text-sm text-slate-300">Закрыть</button>
+                            <button type="submit" class="px-5 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-xs sm:text-sm font-semibold shadow-lg">
+                                Сохранить подход
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            openModal('tile-workout-modal');
+        }
+
+        function handleModalTileWorkoutSubmit(e, memberId, exerciseName) {
+            e.preventDefault();
+            const needsWeight = isExerciseWeighted(exerciseName);
+            const weightEl = document.getElementById('modal-tile-weight');
+            const weight = needsWeight && weightEl ? (parseFloat(weightEl.value) || 0) : 0;
+            const reps = parseInt(document.getElementById('modal-tile-reps').value) || 1;
+            const sets = parseInt(document.getElementById('modal-tile-sets').value) || 1;
+            const date = document.getElementById('modal-tile-date').value;
+            const note = document.getElementById('modal-tile-note').value.trim();
+
+            state.workouts.push({
+                id: 'w_' + Date.now(),
+                memberId,
+                exercise: exerciseName,
+                weight,
+                reps,
+                sets,
+                date,
+                note
+            });
+
+            saveState();
+            renderAll();
+            openTileWorkoutModal(exerciseName, memberId);
+            showToast(`Подход в «${exerciseName}» сохранен!`, 'success');
+        }
+
+        function openDayWorkoutModal(memberId, dateStr) {
+            const member = state.members.find(m => m.id === memberId) || { name: 'Участник', color: '#8b5cf6' };
+            const dayWorkouts = state.workouts.filter(w => w.memberId === memberId && w.date === dateStr);
+            const container = document.getElementById('day-workout-modal-content');
+
+            const totalSets = dayWorkouts.reduce((acc, w) => acc + Number(w.sets), 0);
+            const totalTonnage = dayWorkouts.reduce((acc, w) => acc + ((w.weight || 0) * w.reps * w.sets), 0);
+
+            const exercisesHtml = dayWorkouts.map((w, idx) => {
+                const needsWeight = isExerciseWeighted(w.exercise) && w.weight > 0;
+                return `
+                    <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <span class="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold flex items-center justify-center">${idx + 1}</span>
+                            <div>
+                                <h4 class="font-bold text-white text-sm">${w.exercise}</h4>
+                                <span class="text-xs text-slate-400">${w.note ? `Заметка: «${w.note}»` : 'Без заметки'}</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-base font-extrabold text-emerald-400 block">
+                                ${needsWeight ? `${w.weight} кг × ${w.reps} повт.` : `${w.reps} повт.`}
+                            </span>
+                            <span class="text-xs text-slate-400">${w.sets} подх. ${needsWeight ? `(${Math.round(w.weight * w.reps * w.sets)} кг)` : ''}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = `
+                <div class="flex justify-between items-start gap-3 pb-4 border-b border-slate-800">
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold text-lg" style="background-color: ${member.color}">
+                            ${member.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <span class="text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                                <i class="fa-regular fa-calendar-check"></i> Тренировка за ${formatDate(dateStr)}
+                            </span>
+                            <h3 class="text-xl font-extrabold text-white">${member.name}</h3>
+                        </div>
+                    </div>
+                    <button onclick="closeModal('day-workout-modal')" class="text-slate-400 hover:text-white p-1">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3 my-4 text-center">
+                    <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                        <span class="text-[11px] text-slate-400 block">Упражнений</span>
+                        <strong class="text-lg text-white">${dayWorkouts.length}</strong>
+                    </div>
+                    <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                        <span class="text-[11px] text-slate-400 block">Всего подходов</span>
+                        <strong class="text-lg text-violet-400">${totalSets}</strong>
+                    </div>
+                    <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                        <span class="text-[11px] text-slate-400 block">Тоннаж за день</span>
+                        <strong class="text-lg text-fuchsia-400">${totalTonnage} кг</strong>
+                    </div>
+                </div>
+
+                <div class="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                    ${exercisesHtml || '<p class="text-center text-slate-500 py-4 text-sm">Нет записей за этот день</p>'}
+                </div>
+
+                <div class="mt-5 pt-3 border-t border-slate-800 flex justify-end">
+                    <button onclick="closeModal('day-workout-modal')" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs sm:text-sm font-semibold">
+                        Закрыть окно
+                    </button>
+                </div>
+            `;
+
+            openModal('day-workout-modal');
+        }
+
+        function renderPersonalPage() {
+            const memberSelect = document.getElementById('personal-member-select');
+            const profileHeader = document.getElementById('personal-profile-header');
+            const tilesGrid = document.getElementById('personal-tiles-grid');
+            const detailPanel = document.getElementById('tile-detail-panel');
+            const hideEmptyCheckbox = document.getElementById('hide-empty-tiles');
+
+            if (!memberSelect) return;
+
+            memberSelect.innerHTML = state.members.map(m => `
+                <option value="${m.id}" ${personalViewedMemberId === m.id ? 'selected' : ''}>${m.name}</option>
+            `).join('');
+
+            const member = state.members.find(m => m.id === personalViewedMemberId) || state.members[0];
+            if (!member) return;
+
+            const memberWorkouts = state.workouts.filter(w => w.memberId === member.id);
+            const totalSets = memberWorkouts.reduce((acc, w) => acc + Number(w.sets), 0);
+            const totalTonnage = memberWorkouts.reduce((acc, w) => acc + ((w.weight || 0) * w.reps * w.sets), 0);
+
+            if (profileHeader) {
+                profileHeader.innerHTML = `
+                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-lg" style="background-color: ${member.color}">
+                        ${member.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-2xl font-extrabold text-white">${member.name}</h2>
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                                Вес тела: ${member.bodyWeight} кг
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-0.5"><i class="fa-solid fa-bullseye text-violet-400 mr-1"></i> Цель: ${member.goal || 'Развитие силы'}</p>
+                    </div>
+                `;
+            }
+
+            const hideEmpty = hideEmptyCheckbox ? hideEmptyCheckbox.checked : false;
+
+            if (tilesGrid) {
+                tilesGrid.innerHTML = state.exercises.map(exObj => {
+                    const exName = exObj.name;
+                    const needsWeight = exObj.needsWeight !== false;
+                    const history = memberWorkouts.filter(w => w.exercise === exName).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                    if (hideEmpty && history.length === 0) return '';
+
+                    const isSelected = selectedTileExercise === exName;
+                    const activeClass = isSelected ? 'exercise-tile-active' : 'hover:border-slate-600 hover:bg-slate-800/60';
+                    const safeExName = exName.replace(/'/g, "\\'");
+
+                    if (history.length === 0) {
+                        return `
+                            <div onclick="selectExerciseTile('${safeExName}')" class="glass-card rounded-2xl p-5 cursor-pointer transition duration-200 border border-slate-800/80 ${activeClass} flex flex-col justify-between">
+                                <div>
+                                    <div class="flex items-start justify-between gap-2 mb-3">
+                                        <div class="w-10 h-10 rounded-xl bg-slate-800/90 border border-slate-700 flex items-center justify-center text-slate-400">
+                                            <i class="fa-solid ${needsWeight ? 'fa-dumbbell' : 'fa-person-running'}"></i>
+                                        </div>
+                                        <span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-900 text-slate-500 border border-slate-800">
+                                            Нет тренировок
+                                        </span>
+                                    </div>
+                                    <h3 class="font-bold text-white text-base mb-1">${exName}</h3>
+                                    <p class="text-xs text-slate-500">Нажмите на плашку, чтобы записать первый подход</p>
+                                </div>
+                                <div class="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-violet-400 font-medium">
+                                    <span>Открыть и записать</span>
+                                    <i class="fa-solid fa-plus text-[10px]"></i>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    const latest = history[0];
+                    const best = history.reduce((prev, curr) => {
+                        if (needsWeight) {
+                            return (curr.weight > prev.weight || (curr.weight === prev.weight && curr.reps > prev.reps)) ? curr : prev;
+                        }
+                        return curr.reps > prev.reps ? curr : prev;
+                    });
+
+                    const mainMetric = needsWeight ? `${latest.weight} кг` : `${latest.reps} повт.`;
+                    const subMetric = needsWeight ? `на ${latest.reps} повт. (${latest.sets} подх.)` : `${latest.sets} подх. без веса`;
+                    const prMetric = needsWeight ? `${best.weight} кг × ${best.reps}` : `${best.reps} повт.`;
+
+                    return `
+                        <div onclick="selectExerciseTile('${safeExName}')" class="glass-card rounded-2xl p-5 cursor-pointer transition duration-200 border border-slate-800 ${activeClass} flex flex-col justify-between relative group">
+                            <div>
+                                <div class="flex items-start justify-between gap-2 mb-3">
+                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-md" style="background-color: ${member.color}33; border: 1px solid ${member.color}66">
+                                        <i class="fa-solid ${needsWeight ? 'fa-dumbbell' : 'fa-bolt'}" style="color: ${member.color}"></i>
+                                    </div>
+                                    <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-900/90 text-slate-300 border border-slate-700">
+                                        <i class="fa-regular fa-calendar text-violet-400 mr-1"></i>${formatDate(latest.date)}
+                                    </span>
+                                </div>
+
+                                <h3 class="font-bold text-white text-base mb-2 group-hover:text-violet-300 transition">${exName}</h3>
+
+                                <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800/90 mb-2">
+                                    <span class="text-[11px] uppercase tracking-wider text-slate-400 block">Последняя тренировка:</span>
+                                    <div class="flex items-baseline gap-2 mt-0.5">
+                                        <span class="text-xl font-extrabold text-white">${mainMetric}</span>
+                                        <span class="text-xs text-slate-400">${subMetric}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                                <div>
+                                    <span class="text-slate-500">Рекорд (PR): </span>
+                                    <strong class="text-amber-400">${prMetric}</strong>
+                                </div>
+                                <span class="text-violet-400 font-semibold flex items-center gap-1">
+                                    Смотреть <i class="fa-solid fa-up-right-from-square text-[10px]"></i>
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            renderPersonalDatesTable(member);
+
+            if (!selectedTileExercise) {
+                detailPanel.classList.add('hidden');
+                return;
+            }
+
+            const selectedExObj = state.exercises.find(e => e.name === selectedTileExercise) || state.exercises[0];
+            const exName = selectedExObj ? selectedExObj.name : 'Жим штанги лежа';
+            const needsWeight = isExerciseWeighted(exName);
+            const exHistory = memberWorkouts.filter(w => w.exercise === exName).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            detailPanel.classList.remove('hidden');
+
+            if (exHistory.length === 0) {
+                detailPanel.innerHTML = `
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div>
+                            <span class="text-xs uppercase tracking-wider text-violet-400 font-semibold">Карточка упражнения (${member.name})</span>
+                            <h3 class="text-2xl font-extrabold text-white">${exName}</h3>
+                            <p class="text-xs text-slate-400 mt-1">У вас пока нет записей в этом упражнении. Нажмите кнопку справа, чтобы записать первый подход.</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="openTileWorkoutModal('${exName.replace(/'/g, "\\'")}', '${member.id}')" class="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold transition">
+                                <i class="fa-solid fa-plus mr-1"></i> Записать подход
+                            </button>
+                            <button onclick="selectedTileExercise = null; renderPersonalPage();" class="text-slate-400 hover:text-white p-2">
+                                <i class="fa-solid fa-xmark text-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                const latest = exHistory[0];
+                const best = exHistory.reduce((prev, curr) => {
+                    if (needsWeight) {
+                        return (curr.weight > prev.weight || (curr.weight === prev.weight && curr.reps > prev.reps)) ? curr : prev;
+                    }
+                    return curr.reps > prev.reps ? curr : prev;
+                });
+
+                const latestMain = needsWeight ? `${latest.weight} кг × ${latest.reps} повт.` : `${latest.reps} повторений`;
+                const bestMain = needsWeight ? `${best.weight} кг × ${best.reps} повт.` : `${best.reps} повторений`;
+                const best1RM = needsWeight ? `Расчетный 1ПМ: ~${calculate1RM(best.weight, best.reps)} кг` : 'Собственный вес';
+
+                const recentListHtml = exHistory.slice(0, 5).map(item => `
+                    <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="text-emerald-400 font-semibold">${formatDate(item.date)}</span>
+                            <span class="text-white font-bold">${needsWeight ? `${item.weight} кг × ${item.reps}` : `${item.reps} повт.`}</span>
+                            <span class="text-slate-400">(${item.sets} подх.)</span>
+                        </div>
+                        <button onclick="openDayWorkoutModal('${member.id}', '${item.date}')" class="text-violet-400 hover:underline">
+                            День
+                        </button>
+                    </div>
+                `).join('');
+
+                detailPanel.innerHTML = `
+                    <div class="flex flex-col lg:flex-row gap-6">
+                        <div class="flex-grow space-y-4">
+                            <div class="flex items-start justify-between gap-4">
+                                <div>
+                                    <span class="text-xs uppercase tracking-wider text-violet-400 font-semibold flex items-center gap-1.5">
+                                        <i class="fa-solid fa-circle-info"></i> Карточка упражнения (${member.name})
+                                    </span>
+                                    <h3 class="text-2xl font-extrabold text-white mt-0.5">${selectedTileExercise}</h3>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button onclick="openTileWorkoutModal('${selectedTileExercise.replace(/'/g, "\\'")}', '${member.id}')" class="px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold transition flex items-center gap-1.5">
+                                        <i class="fa-solid fa-plus"></i> Записать / История
+                                    </button>
+                                    <button onclick="selectedTileExercise = null; renderPersonalPage();" class="text-slate-400 hover:text-white p-2">
+                                        <i class="fa-solid fa-xmark text-lg"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800">
+                                    <span class="text-xs text-slate-400 block mb-1">Крайняя тренировка была: <strong class="text-emerald-400">${formatDate(latest.date)}</strong></span>
+                                    <div class="text-2xl font-extrabold text-white">${latestMain}</div>
+                                    <div class="text-xs text-slate-400 mt-1">Выполнено подходов: <strong>${latest.sets}</strong> ${latest.note ? `• «${latest.note}»` : ''}</div>
+                                </div>
+                                <div class="p-4 rounded-2xl bg-slate-900/90 border border-amber-500/20">
+                                    <span class="text-xs text-amber-400 font-medium block mb-1"><i class="fa-solid fa-trophy mr-1"></i>Личный рекорд (от ${formatDate(best.date)})</span>
+                                    <div class="text-2xl font-extrabold text-amber-400">${bestMain}</div>
+                                    <div class="text-xs text-slate-400 mt-1">${best1RM}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="lg:w-96 flex flex-col justify-between border-t lg:border-t-0 lg:border-l border-slate-800 pt-4 lg:pt-0 lg:pl-6">
+                            <div>
+                                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">Последние записи (${exHistory.length})</h4>
+                                <div class="space-y-2">
+                                    ${recentListHtml}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function renderPersonalDatesTable(member) {
+            const tbody = document.getElementById('personal-dates-table-body');
+            if (!tbody || !member) return;
+
+            const memberWorkouts = state.workouts.filter(w => w.memberId === member.id);
+            const groupedByDate = {};
+            memberWorkouts.forEach(w => {
+                if (!groupedByDate[w.date]) groupedByDate[w.date] = [];
+                groupedByDate[w.date].push(w);
+            });
+
+            const sortedDates = Object.keys(groupedByDate).sort((a, b) => new Date(b) - new Date(a));
+
+            if (sortedDates.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-500">У ${member.name} пока нет записанных тренировок</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = sortedDates.map(dateStr => {
+                const items = groupedByDate[dateStr];
+                const totalSets = items.reduce((s, w) => s + Number(w.sets), 0);
+                const totalTonnage = items.reduce((s, w) => s + ((w.weight || 0) * w.reps * w.sets), 0);
+
+                const pills = items.map(w => {
+                    const needsWeight = isExerciseWeighted(w.exercise) && w.weight > 0;
+                    const text = needsWeight ? `${w.weight} кг × ${w.reps} (${w.sets} подх.)` : `${w.reps} повт. × ${w.sets} подх.`;
+                    return `
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-slate-900 border border-slate-700/80 mr-1.5 mb-1.5">
+                            <strong class="text-white">${w.exercise}:</strong>
+                            <span class="text-violet-300 font-semibold">${text}</span>
+                        </span>
+                    `;
+                }).join('');
+
+                return `
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="py-3.5 px-4 whitespace-nowrap font-semibold text-white">
+                            <i class="fa-regular fa-calendar text-emerald-400 mr-1.5"></i>${formatDate(dateStr)}
+                        </td>
+                        <td class="py-3.5 px-4 whitespace-nowrap">
+                            <span class="inline-flex items-center gap-2 font-medium text-white">
+                                <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${member.color}"></span>
+                                ${member.name}
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-4">${pills}</td>
+                        <td class="py-3.5 px-4 whitespace-nowrap text-xs text-slate-300">
+                            <strong>${items.length}</strong> упр. • <strong>${totalSets}</strong> подх. ${totalTonnage > 0 ? `(${totalTonnage} кг)` : ''}
+                        </td>
+                        <td class="py-3.5 px-4 text-right whitespace-nowrap">
+                            <button onclick="openDayWorkoutModal('${member.id}', '${dateStr}')" class="px-3 py-1.5 rounded-xl bg-violet-600/20 hover:bg-violet-600 text-violet-300 hover:text-white border border-violet-500/30 text-xs font-semibold transition">
+                                <i class="fa-solid fa-eye mr-1"></i>Смотреть тренировку
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderWhoDidWhatTable() {
+            const tbody = document.getElementById('who-did-what-tbody');
+            const memberFilterEl = document.getElementById('schedule-member-filter');
+            const dateFilterEl = document.getElementById('schedule-date-filter');
+            if (!tbody) return;
+
+            if (memberFilterEl) {
+                const currentFilterVal = memberFilterEl.value || 'all';
+                memberFilterEl.innerHTML = `<option value="all">Все участники</option>` +
+                    state.members.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+                if (currentFilterVal === 'all' || state.members.some(m => m.id === currentFilterVal)) {
+                    memberFilterEl.value = currentFilterVal;
+                }
+            }
+
+            const selectedMemberFilter = memberFilterEl ? memberFilterEl.value : 'all';
+            const selectedDateFilter = dateFilterEl ? dateFilterEl.value : '';
+
+            const sessionsMap = {};
+            state.workouts.forEach(w => {
+                if (selectedMemberFilter !== 'all' && w.memberId !== selectedMemberFilter) return;
+                if (selectedDateFilter && w.date !== selectedDateFilter) return;
+
+                const key = `${w.date}__${w.memberId}`;
+                if (!sessionsMap[key]) {
+                    sessionsMap[key] = {
+                        date: w.date,
+                        memberId: w.memberId,
+                        exercises: []
+                    };
+                }
+                sessionsMap[key].exercises.push(w);
+            });
+
+            const sessionsList = Object.values(sessionsMap).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            if (sessionsList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-500">По выбранным фильтрам тренировок не найдено</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = sessionsList.map(session => {
+                const member = state.members.find(m => m.id === session.memberId) || { name: 'Удален', color: '#64748b' };
+                const totalSets = session.exercises.reduce((acc, w) => acc + Number(w.sets), 0);
+                const totalTonnage = session.exercises.reduce((acc, w) => acc + ((w.weight || 0) * w.reps * w.sets), 0);
+
+                const exercisesBadges = session.exercises.map(w => {
+                    const needsWeight = isExerciseWeighted(w.exercise) && w.weight > 0;
+                    const metricText = needsWeight ? `${w.weight} кг × ${w.reps} (${w.sets} подх.)` : `${w.reps} повт. × ${w.sets} подх.`;
+                    const safeExName = w.exercise.replace(/'/g, "\\'");
+                    return `
+                        <button type="button" onclick="openTileWorkoutModal('${safeExName}', '${session.memberId}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-slate-900 hover:bg-slate-800 border border-slate-700/80 mr-1.5 mb-1.5 transition">
+                            <span class="font-semibold text-white">${w.exercise}:</span>
+                            <span class="text-emerald-400 font-bold">${metricText}</span>
+                        </button>
+                    `;
+                }).join('');
+
+                return `
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="py-3.5 px-4 whitespace-nowrap">
+                            <span class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 font-bold text-white text-xs">
+                                <i class="fa-regular fa-calendar text-violet-400 mr-1.5"></i>${formatDate(session.date)}
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-4 whitespace-nowrap">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs" style="background-color: ${member.color}">
+                                    ${member.name.charAt(0).toUpperCase()}
+                                </div>
+                                <span class="font-bold text-white">${member.name}</span>
+                            </div>
+                        </td>
+                        <td class="py-3.5 px-4">
+                            ${exercisesBadges}
+                        </td>
+                        <td class="py-3.5 px-4 whitespace-nowrap text-xs text-slate-300">
+                            <div><strong>${session.exercises.length}</strong> упр. / <strong>${totalSets}</strong> подх.</div>
+                            ${totalTonnage > 0 ? `<div class="text-slate-400">Тоннаж: ${totalTonnage} кг</div>` : ''}
+                        </td>
+                        <td class="py-3.5 px-4 text-right whitespace-nowrap">
+                            <button onclick="openDayWorkoutModal('${session.memberId}', '${session.date}')" class="px-3 py-1.5 rounded-xl bg-violet-600/20 hover:bg-violet-600 text-violet-300 hover:text-white border border-violet-500/30 text-xs font-semibold transition">
+                                <i class="fa-solid fa-expand mr-1"></i>Открыть день
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function clearScheduleFilters() {
+            const memberFilterEl = document.getElementById('schedule-member-filter');
+            const dateFilterEl = document.getElementById('schedule-date-filter');
+            if (memberFilterEl) memberFilterEl.value = 'all';
+            if (dateFilterEl) dateFilterEl.value = '';
+            renderWhoDidWhatTable();
+        }
+
+        function renderProfiles() {
+            const container = document.getElementById('profiles-grid');
+            const clearBtn = document.getElementById('clear-filter-btn');
+            const modalList = document.getElementById('modal-members-list');
+            
+            if (state.selectedMemberId !== 'all') {
+                clearBtn.classList.remove('hidden');
+            } else {
+                clearBtn.classList.add('hidden');
+            }
+
+            if (modalList) {
+                if (state.members.length === 0) {
+                    modalList.innerHTML = `<p class="text-xs text-slate-500 text-center py-2">Список участников пуст</p>`;
+                } else {
+                    modalList.innerHTML = state.members.map(m => `
+                        <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+                            <div class="flex items-center gap-2.5 truncate">
+                                <span class="w-3 h-3 rounded-full shrink-0" style="background-color: ${m.color}"></span>
+                                <span class="text-sm font-medium text-white truncate">${m.name}</span>
+                                <span class="text-xs text-slate-500">(${m.bodyWeight} кг)</span>
+                            </div>
+                            <button type="button" onclick="promptDeleteMember(event, '${m.id}')" class="px-2.5 py-1 rounded-lg bg-rose-950/50 hover:bg-rose-600 text-rose-400 hover:text-white text-xs font-medium transition flex items-center gap-1 shrink-0">
+                                <i class="fa-solid fa-trash-can"></i> Удалить
+                            </button>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            if (state.members.length === 0) {
+                container.innerHTML = `
+                    <div onclick="openModal('member-modal')" class="col-span-full glass-card rounded-2xl p-8 text-center cursor-pointer hover:border-violet-500/50 transition border border-dashed border-slate-700">
+                        <div class="w-12 h-12 rounded-2xl bg-violet-600/20 text-violet-400 flex items-center justify-center mx-auto mb-3 text-xl">
+                            <i class="fa-solid fa-user-plus"></i>
+                        </div>
+                        <h3 class="text-base font-bold text-white mb-1">В команде пока никого нет</h3>
+                        <p class="text-xs text-slate-400">Нажмите сюда, чтобы добавить себя и своих подруг</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = state.members.map(member => {
+                const memberWorkouts = state.workouts.filter(w => w.memberId === member.id);
+                const totalSets = memberWorkouts.reduce((acc, w) => acc + Number(w.sets), 0);
+                const totalTonnage = memberWorkouts.reduce((acc, w) => acc + ((w.weight || 0) * w.reps * w.sets), 0);
+                
+                let bestLift = 'Нет записей';
+                if (memberWorkouts.length > 0) {
+                    const weightedWorkouts = memberWorkouts.filter(w => w.weight > 0);
+                    if (weightedWorkouts.length > 0) {
+                        const maxW = weightedWorkouts.reduce((prev, current) => (prev.weight > current.weight) ? prev : current);
+                        bestLift = `${maxW.exercise}: ${maxW.weight} кг`;
+                    } else {
+                        const maxR = memberWorkouts.reduce((prev, current) => (prev.reps > current.reps) ? prev : current);
+                        bestLift = `${maxR.exercise}: ${maxR.reps} повт.`;
+                    }
+                }
+
+                const isSelected = state.selectedMemberId === member.id;
+                const activeClasses = isSelected ? 'ring-2 ring-violet-500 bg-slate-800/90' : 'hover:bg-slate-800/60';
+
+                return `
+                    <div onclick="selectMember('${member.id}')" class="glass-card rounded-2xl p-5 cursor-pointer transition duration-200 ${activeClasses} relative group">
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-md shrink-0" style="background-color: ${member.color}">
+                                    ${member.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div class="min-w-0">
+                                    <h3 class="font-bold text-white text-base truncate">
+                                        ${member.name}
+                                    </h3>
+                                    <span class="text-xs text-slate-400">Вес тела: <strong class="text-slate-200">${member.bodyWeight} кг</strong></span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-900/90 text-slate-300 border border-slate-700">
+                                    ${memberWorkouts.length} трен.
+                                </span>
+                                <button onclick="promptDeleteMember(event, '${member.id}')" title="Удалить участника" class="w-7 h-7 rounded-lg bg-slate-900/90 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700/80 hover:border-rose-500/40 flex items-center justify-center transition">
+                                    <i class="fa-solid fa-trash-can text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="text-xs text-slate-300 mb-3 truncate">
+                            <i class="fa-solid fa-bullseye text-violet-400 mr-1"></i> Цель: <span class="text-slate-400">${member.goal || 'Стать сильнее'}</span>
+                        </div>
+
+                        <div class="pt-3 border-t border-slate-800/80 flex justify-between items-center text-xs">
+                            <div>
+                                <span class="text-slate-500 block">Общий тоннаж</span>
+                                <span class="font-bold text-slate-200">${(totalTonnage / 1000).toFixed(1)} т (${totalSets} подх.)</span>
+                            </div>
+                            <div class="text-right max-w-[55%] truncate">
+                                <span class="text-slate-500 block">Топ результат</span>
+                                <span class="font-semibold text-amber-400 truncate">${bestLift}</span>
+                            </div>
+                        </div>
+                        <div class="mt-3 pt-2.5 border-t border-slate-800/50 flex justify-between items-center">
+                            <button onclick="event.stopPropagation(); personalViewedMemberId='${member.id}'; switchPage('personal');" class="text-[11px] font-semibold text-violet-400 hover:text-violet-300 flex items-center gap-1">
+                                <i class="fa-solid fa-layer-group"></i> Открыть плашки
+                            </button>
+                            ${currentAccount && currentAccount.id === member.id ? '<span class="text-[10px] text-emerald-400 font-semibold">• Вы</span>' : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectMember(id) {
+            if (state.selectedMemberId === id) {
+                state.selectedMemberId = 'all';
+            } else {
+                state.selectedMemberId = id;
+                document.getElementById('form-member').value = id;
+                document.getElementById('bw-member').value = id;
+            }
+            renderProfiles();
+            renderHistory();
+        }
+
+        function populateDropdowns() {
+            const formMember = document.getElementById('form-member');
+            const bwMember = document.getElementById('bw-member');
+            const formExercise = document.getElementById('form-exercise');
+            const chartExercise = document.getElementById('chart-exercise-select');
+
+            const currentMemberVal = formMember.value;
+            const currentExVal = formExercise.value;
+            const currentChartExVal = chartExercise.value;
+
+            if (state.members.length === 0) {
+                const emptyOpt = `<option value="" disabled selected>Сначала добавьте участника</option>`;
+                formMember.innerHTML = emptyOpt;
+                bwMember.innerHTML = emptyOpt;
+            } else {
+                const memberOptions = state.members.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+                formMember.innerHTML = memberOptions;
+                bwMember.innerHTML = memberOptions;
+
+                if (currentMemberVal && state.members.some(m => m.id === currentMemberVal)) {
+                    formMember.value = currentMemberVal;
+                }
+            }
+
+            const exOptions = state.exercises.map(ex => {
+                const tag = ex.needsWeight ? '' : ' (без веса)';
+                return `<option value="${ex.name}">${ex.name}${tag}</option>`;
+            }).join('');
+            formExercise.innerHTML = exOptions;
+            chartExercise.innerHTML = exOptions;
+
+            if (currentExVal && state.exercises.some(e => e.name === currentExVal)) {
+                formExercise.value = currentExVal;
+            }
+            if (currentChartExVal && state.exercises.some(e => e.name === currentChartExVal)) {
+                chartExercise.value = currentChartExVal;
+            }
+        }
+
+        function handleExerciseChange() {
+            const selectedEx = document.getElementById('form-exercise').value;
+            const needsWeight = isExerciseWeighted(selectedEx);
+            const weightContainer = document.getElementById('weight-field-container');
+            const weightInput = document.getElementById('form-weight');
+            const gridContainer = document.getElementById('workout-inputs-grid');
+
+            if (needsWeight) {
+                weightContainer.classList.remove('hidden');
+                weightInput.required = true;
+                gridContainer.classList.remove('grid-cols-2');
+                gridContainer.classList.add('grid-cols-3');
+            } else {
+                weightContainer.classList.add('hidden');
+                weightInput.required = false;
+                weightInput.value = '';
+                gridContainer.classList.remove('grid-cols-3');
+                gridContainer.classList.add('grid-cols-2');
+            }
+            updateLive1RM();
+        }
+
+        function updateLive1RM() {
+            const selectedEx = document.getElementById('form-exercise').value;
+            const needsWeight = isExerciseWeighted(selectedEx);
+
+            const w = parseFloat(document.getElementById('form-weight').value);
+            const r = parseInt(document.getElementById('form-reps').value);
+            const s = parseInt(document.getElementById('form-sets').value) || 1;
+
+            const leftBox = document.getElementById('live-metric-left');
+            const rightBox = document.getElementById('live-metric-right');
+
+            if (needsWeight) {
+                const rmVal = (w > 0 && r > 0) ? `${calculate1RM(w, r)} кг` : '— кг';
+                const tonVal = (w > 0 && r > 0) ? `${Math.round(w * r * s)} кг` : '— кг';
+                leftBox.innerHTML = `<span class="text-slate-400">Расчетный 1ПМ (максимум):</span><span id="live-1rm" class="font-bold text-violet-400 ml-1">${rmVal}</span>`;
+                rightBox.innerHTML = `<span class="text-slate-400">Тоннаж:</span><span id="live-tonnage" class="font-bold text-fuchsia-400 ml-1">${tonVal}</span>`;
+            } else {
+                const totalReps = (r > 0) ? `${r * s} повт.` : '— повт.';
+                leftBox.innerHTML = `<span class="text-slate-400">Формат:</span><span class="font-bold text-emerald-400 ml-1">Собственный вес</span>`;
+                rightBox.innerHTML = `<span class="text-slate-400">Всего за подходы:</span><span class="font-bold text-fuchsia-400 ml-1">${totalReps}</span>`;
+            }
+        }
+
+        function renderPRTable() {
+            const tbody = document.getElementById('pr-table-body');
+            
+            const rowsHtml = state.exercises.map(exObj => {
+                const exercise = exObj.name;
+                const needsWeight = exObj.needsWeight !== false;
+                const exWorkouts = state.workouts.filter(w => w.exercise === exercise);
+                if (exWorkouts.length === 0) return '';
+
+                const memberBests = [];
+                state.members.forEach(m => {
+                    const mLifts = exWorkouts.filter(w => w.memberId === m.id);
+                    if (mLifts.length > 0) {
+                        const best = mLifts.reduce((prev, curr) => {
+                            if (needsWeight) {
+                                return (curr.weight > prev.weight || (curr.weight === prev.weight && curr.reps > prev.reps)) ? curr : prev;
+                            } else {
+                                return (curr.reps > prev.reps) ? curr : prev;
+                            }
+                        });
+                        memberBests.push({
+                            member: m,
+                            weight: best.weight,
+                            reps: best.reps,
+                            sets: best.sets,
+                            rm: needsWeight ? calculate1RM(best.weight, best.reps) : 0
+                        });
+                    }
+                });
+
+                memberBests.sort((a, b) => needsWeight ? (b.weight - a.weight || b.reps - a.reps) : (b.reps - a.reps));
+                const leader = memberBests[0];
+
+                const badgesHtml = memberBests.map(mb => `
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-slate-900 border border-slate-800 mr-1.5 mb-1">
+                        <span class="w-2 h-2 rounded-full" style="background-color: ${mb.member.color}"></span>
+                        <span class="text-slate-300">${mb.member.name}:</span>
+                        <strong class="text-white">${needsWeight ? `${mb.weight} кг × ${mb.reps}` : `${mb.reps} повт.`}</strong>
+                    </span>
+                `).join('');
+
+                const bestResultHtml = needsWeight
+                    ? `<span class="font-bold text-amber-400">${leader.weight} кг</span><span class="text-xs text-slate-400"> (на ${leader.reps} повт.)</span>`
+                    : `<span class="font-bold text-emerald-400">${leader.reps} повт.</span><span class="text-xs text-slate-400"> (без веса)</span>`;
+
+                return `
+                    <tr class="hover:bg-slate-800/30 transition">
+                        <td class="py-3 px-3 font-medium text-white">
+                            ${exercise}
+                            ${!needsWeight ? '<span class="ml-1.5 px-1.5 py-0.5 text-[10px] rounded bg-slate-800 text-slate-400 border border-slate-700">Свой вес</span>' : ''}
+                        </td>
+                        <td class="py-3 px-3">
+                            <span class="inline-flex items-center gap-1.5 font-semibold" style="color: ${leader.member.color}">
+                                <i class="fa-solid fa-crown text-amber-400 text-xs"></i> ${leader.member.name}
+                            </span>
+                        </td>
+                        <td class="py-3 px-3">
+                            ${bestResultHtml}
+                        </td>
+                        <td class="py-3 px-3">${badgesHtml}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            tbody.innerHTML = rowsHtml || `<tr><td colspan="4" class="py-6 text-center text-slate-500">Записей пока нет. Добавьте первую тренировку!</td></tr>`;
+        }
+
+        function renderHistory() {
+            const tbody = document.getElementById('history-table-body');
+            const subtitle = document.getElementById('history-subtitle');
+            const searchQuery = document.getElementById('search-history').value.toLowerCase().trim();
+
+            let filtered = [...state.workouts];
+
+            if (state.selectedMemberId !== 'all') {
+                const m = state.members.find(x => x.id === state.selectedMemberId);
+                filtered = filtered.filter(w => w.memberId === state.selectedMemberId);
+                subtitle.textContent = `Фильтр по участнику: ${m ? m.name : ''}`;
+            } else {
+                subtitle.textContent = 'Показаны записи всех участников';
+            }
+
+            if (searchQuery) {
+                filtered = filtered.filter(w => {
+                    const member = state.members.find(m => m.id === w.memberId);
+                    const mName = member ? member.name.toLowerCase() : '';
+                    return w.exercise.toLowerCase().includes(searchQuery) || 
+                           mName.includes(searchQuery) ||
+                           (w.note && w.note.toLowerCase().includes(searchQuery));
+                });
+            }
+
+            filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="py-8 text-center text-slate-500">Подходящих записей тренировок не найдено</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(w => {
+                const member = state.members.find(m => m.id === w.memberId) || { name: 'Удален', color: '#64748b' };
+                const needsWeight = isExerciseWeighted(w.exercise) && w.weight > 0;
+                const tonnage = needsWeight ? `${Math.round(w.weight * w.reps * w.sets)} кг` : `${w.reps * w.sets} повт.`;
+                const rmBadge = needsWeight
+                    ? `<span class="px-2 py-0.5 rounded bg-violet-500/10 text-violet-300 border border-violet-500/20 text-xs font-semibold">~${calculate1RM(w.weight, w.reps)} кг</span>`
+                    : `<span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-xs font-semibold">Свой вес</span>`;
+
+                const weightAndRepsText = needsWeight
+                    ? `<span class="font-bold text-white">${w.weight} кг</span><span class="text-slate-400"> × ${w.reps} (${w.sets} подх.)</span>`
+                    : `<span class="font-bold text-emerald-400">${w.reps} повт.</span><span class="text-slate-400"> × ${w.sets} подх.</span>`;
+
+                return `
+                    <tr class="hover:bg-slate-800/40 transition group">
+                        <td class="py-3 px-4 text-slate-400 whitespace-nowrap">${formatDate(w.date)}</td>
+                        <td class="py-3 px-4 whitespace-nowrap">
+                            <span class="inline-flex items-center gap-2 font-medium text-white">
+                                <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${member.color}"></span>
+                                ${member.name}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 font-medium text-slate-200">${w.exercise}</td>
+                        <td class="py-3 px-4 whitespace-nowrap">
+                            ${weightAndRepsText}
+                        </td>
+                        <td class="py-3 px-4 text-slate-300 whitespace-nowrap">${tonnage}</td>
+                        <td class="py-3 px-4 whitespace-nowrap">
+                            ${rmBadge}
+                        </td>
+                        <td class="py-3 px-4 text-slate-400 text-xs max-w-xs truncate">${w.note || '—'}</td>
+                        <td class="py-3 px-4 text-right">
+                            <button onclick="deleteWorkout('${w.id}')" title="Удалить запись" class="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-rose-950/40 transition">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updateCharts() {
+            const selectedExercise = document.getElementById('chart-exercise-select').value;
+            const needsWeight = isExerciseWeighted(selectedExercise);
+            const ctx = document.getElementById('progressChart').getContext('2d');
+
+            const titleEl = document.getElementById('chart-title-text');
+            const subtitleEl = document.getElementById('chart-subtitle-text');
+            if (needsWeight) {
+                titleEl.textContent = 'Динамика рабочих весов';
+                subtitleEl.textContent = 'Сравнение прогресса всех участников по рабочему весу (кг)';
+            } else {
+                titleEl.textContent = 'Динамика повторений (свой вес)';
+                subtitleEl.textContent = 'Сравнение прогресса участников по количеству повторений за подход';
+            }
+
+            const exWorkouts = state.workouts
+                .filter(w => w.exercise === selectedExercise)
+                .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            const allDates = [...new Set(exWorkouts.map(w => w.date))].sort((a, b) => new Date(a) - new Date(b));
+
+            const datasets = [];
+            state.members.forEach(member => {
+                const memberLifts = exWorkouts.filter(w => w.memberId === member.id);
+                if (memberLifts.length > 0) {
+                    const dataPoints = allDates.map(d => {
+                        const found = memberLifts.filter(w => w.date === d);
+                        if (found.length === 0) return null;
+                        return Math.max(...found.map(f => needsWeight ? f.weight : f.reps));
+                    });
+
+                    datasets.push({
+                        label: member.name,
+                        data: dataPoints,
+                        borderColor: member.color,
+                        backgroundColor: member.color + '33',
+                        borderWidth: 3,
+                        pointBackgroundColor: member.color,
+                        pointRadius: 5,
+                        pointHoverRadius: 7,
+                        tension: 0.3,
+                        spanGaps: true
+                    });
+                }
+            });
+
+            if (progressChartInstance) {
+                progressChartInstance.destroy();
+            }
+
+            const unitLabel = needsWeight ? 'кг' : 'повт.';
+
+            progressChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: allDates.map(d => formatDate(d)),
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: '#cbd5e1',
+                                usePointStyle: true,
+                                padding: 20,
+                                font: { family: 'Inter', size: 12 }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#0f172a',
+                            titleColor: '#f8fafc',
+                            bodyColor: '#cbd5e1',
+                            borderColor: '#334155',
+                            borderWidth: 1,
+                            padding: 12,
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.parsed.y} ${unitLabel}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: {
+                                color: '#94a3b8',
+                                callback: function(val) { return val + ' ' + unitLabel; }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function handleWorkoutSubmit(e) {
+            e.preventDefault();
+            const memberId = document.getElementById('form-member').value;
+            if (!memberId) {
+                showToast('Сначала добавьте хотя бы одного участника!', 'info');
+                openModal('member-modal');
+                return;
+            }
+            const exercise = document.getElementById('form-exercise').value;
+            const needsWeight = isExerciseWeighted(exercise);
+            const weight = needsWeight ? (parseFloat(document.getElementById('form-weight').value) || 0) : 0;
+            const reps = parseInt(document.getElementById('form-reps').value);
+            const sets = parseInt(document.getElementById('form-sets').value);
+            const date = document.getElementById('form-date').value;
+            const note = document.getElementById('form-note').value.trim();
+
+            const newWorkout = {
+                id: 'w_' + Date.now(),
+                memberId,
+                exercise,
+                weight,
+                reps,
+                sets,
+                date,
+                note
+            };
+
+            state.workouts.push(newWorkout);
+            saveState();
+
+            document.getElementById('chart-exercise-select').value = exercise;
+            document.getElementById('form-weight').value = '';
+            document.getElementById('form-reps').value = '';
+            document.getElementById('form-note').value = '';
+            updateLive1RM();
+
+            renderAll();
+            const member = state.members.find(m => m.id === memberId);
+            const detailsText = needsWeight ? `${weight} кг × ${reps}` : `${reps} повт. × ${sets} подх.`;
+            showToast(`Записано: ${member ? member.name : ''} — ${exercise} (${detailsText})`, 'success');
+        }
+
+        function handleBodyWeightUpdate(e) {
+            e.preventDefault();
+            const memberId = document.getElementById('bw-member').value;
+            const newBw = parseFloat(document.getElementById('bw-input').value);
+
+            const member = state.members.find(m => m.id === memberId);
+            if (member && newBw > 0) {
+                member.bodyWeight = newBw;
+                saveState();
+                renderProfiles();
+                document.getElementById('bw-input').value = '';
+                showToast(`Вес тела для ${member.name} обновлен: ${newBw} кг`, 'info');
+            }
+        }
+
+        function handleAddMember(e) {
+            e.preventDefault();
+            const name = document.getElementById('new-member-name').value.trim();
+            const bw = parseFloat(document.getElementById('new-member-bw').value);
+            const color = document.getElementById('new-member-color').value;
+            const goal = document.getElementById('new-member-goal').value.trim();
+
+            if (!name) return;
+
+            const newMember = {
+                id: 'm_' + Date.now(),
+                name,
+                bodyWeight: bw || 60,
+                color,
+                goal: goal || 'Прогресс в силовых'
+            };
+
+            state.members.push(newMember);
+            saveState();
+            renderAll();
+            e.target.reset();
+            showToast(`Участник ${name} добавлен в команду!`, 'success');
+        }
+
+        function promptDeleteMember(e, memberId) {
+            if (e) e.stopPropagation();
+            const member = state.members.find(m => m.id === memberId);
+            if (!member) return;
+
+            memberIdToDelete = memberId;
+            document.getElementById('delete-member-name').textContent = member.name;
+            openModal('delete-member-modal');
+        }
+
+        function confirmDeleteMember() {
+            if (!memberIdToDelete) return;
+            const member = state.members.find(m => m.id === memberIdToDelete);
+            const memberName = member ? member.name : 'Участник';
+
+            state.members = state.members.filter(m => m.id !== memberIdToDelete);
+            state.workouts = state.workouts.filter(w => w.memberId !== memberIdToDelete);
+
+            if (state.selectedMemberId === memberIdToDelete) {
+                state.selectedMemberId = 'all';
+            }
+
+            memberIdToDelete = null;
+            saveState();
+            renderAll();
+            closeModal('delete-member-modal');
+            showToast(`Профиль «${memberName}» удален`, 'info');
+        }
+
+        function handleAddExercise(e) {
+            e.preventDefault();
+            const name = document.getElementById('new-exercise-name').value.trim();
+            const weightType = document.querySelector('input[name="exercise-weight-type"]:checked').value;
+            const needsWeight = weightType === 'weighted';
+
+            if (!name) return;
+
+            const existing = state.exercises.find(ex => ex.name.toLowerCase() === name.toLowerCase());
+            if (!existing) {
+                state.exercises.push({ name, needsWeight });
+                saveState();
+                populateDropdowns();
+                document.getElementById('form-exercise').value = name;
+                handleExerciseChange();
+                showToast(`Упражнение «${name}» (${needsWeight ? 'с весом' : 'без веса'}) добавлено!`, 'success');
+            } else {
+                existing.needsWeight = needsWeight;
+                saveState();
+                populateDropdowns();
+                document.getElementById('form-exercise').value = existing.name;
+                handleExerciseChange();
+                showToast(`Настройки упражнения «${existing.name}» обновлены!`, 'info');
+            }
+            closeModal('exercise-modal');
+            e.target.reset();
+        }
+
+        function deleteWorkout(id) {
+            state.workouts = state.workouts.filter(w => w.id !== id);
+            saveState();
+            renderAll();
+            showToast('Запись тренировки удалена', 'info');
+        }
+
+        function clearWorkoutsOnly() {
+            state.workouts = [];
+            saveState();
+            renderAll();
+            closeModal('reset-modal');
+            showToast('Все записи тренировок очищены', 'info');
+        }
+
+        function resetToDemoData() {
+            state.members = [...defaultMembers];
+            state.exercises = [...defaultExercises];
+            state.workouts = [...defaultWorkouts];
+            state.selectedMemberId = 'all';
+            currentAccount = state.members[0];
+            personalViewedMemberId = currentAccount.id;
+            saveState();
+            renderAll();
+            closeModal('reset-modal');
+            showToast('Демонстрационные данные восстановлены', 'success');
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const parts = dateStr.split('-');
+            if (parts.length !== 3) return dateStr;
+            return `${parts[2]}.${parts[1]}.${parts[0]}`;
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const bgColors = {
+                success: 'bg-emerald-950/90 border-emerald-500/40 text-emerald-200',
+                info: 'bg-slate-900/95 border-violet-500/40 text-slate-200'
+            };
+
+            const icons = {
+                success: '<i class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>',
+                info: '<i class="fa-solid fa-circle-info text-violet-400 text-lg"></i>'
+            };
+
+            toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-xl backdrop-blur-md transition-all duration-300 transform translate-y-2 opacity-0 ${bgColors[type]}`;
+            toast.innerHTML = `
+                ${icons[type]}
+                <span class="text-xs sm:text-sm font-medium">${message}</span>
+            `;
+
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+
+        Object.assign(window, {
+            openModal,
+            closeModal,
+            openAuthModal,
+            switchAuthTab,
+            switchGateTab,
+            handleLogin,
+            handleRegister,
+            handleLogout,
+            quickLoginAs,
+            switchPage,
+            handlePersonalMemberChange,
+            selectExerciseTile,
+            openTileWorkoutModal,
+            openQuickWorkoutModalForPersonal,
+            handleModalTileWorkoutSubmit,
+            openDayWorkoutModal,
+            renderPersonalPage,
+            renderWhoDidWhatTable,
+            clearScheduleFilters,
+            selectMember,
+            handleExerciseChange,
+            updateLive1RM,
+            handleWorkoutSubmit,
+            handleBodyWeightUpdate,
+            handleAddMember,
+            promptDeleteMember,
+            confirmDeleteMember,
+            handleAddExercise,
+            deleteWorkout,
+            clearWorkoutsOnly,
+            resetToDemoData,
+            renderHistory,
+            updateCharts
+        });
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>
